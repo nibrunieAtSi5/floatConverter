@@ -32,6 +32,9 @@ class HardFloatRecFN:
     @property
     def minNormalExp(self):
         return 2**(self.expSize - 2) + 2
+    @property
+    def minSubNormalExp(self):
+        return 2**(self.expSize - 2) + 2 - self.sigSize
 
     def expNormalToIEEE(self, expValue):
         return expValue - 2**(self.expSize - 2) - 1
@@ -55,6 +58,7 @@ def bitMask(size):
     return 2**size - 1
 
 def RecFNtoIEEE(v, base=16, size=64):
+    v = v.replace("_", "")
     v = int(v, base=base)
     recfn = HARDFLOAT_FORMAT_MAP[size]
     SIGMASK = bitMask(recfn.sigSize - 1)
@@ -72,6 +76,7 @@ def RecFNtoIEEE(v, base=16, size=64):
         # todo/fixme: payload forwarding
         return ieeefn.makeNaN(sign)
     elif exp < recfn.minNormalExp:
+        assert exp >= recfn.minSubNormalExp, "invalid exponent"
         lzc = recfn.minNormalExp - exp
         maskOffOne = (1 << (recfn.sigSize - 1))
         return ieeefn.buildValue(sign, 0, (sig | maskOffOne) >> lzc)
