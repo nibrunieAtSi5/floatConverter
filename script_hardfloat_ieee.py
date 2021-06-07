@@ -72,7 +72,7 @@ def RecFNtoIEEE(v, base=16, size=64):
         return ieee_sign 
     elif recfn.isExpInf(exp):
         return ieeefn.makeInf(sign) 
-    elif recfn.isExpNaN(sign):
+    elif recfn.isExpNaN(exp):
         # todo/fixme: payload forwarding
         return ieeefn.makeNaN(sign)
     elif exp < recfn.minNormalExp:
