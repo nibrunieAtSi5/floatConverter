@@ -108,7 +108,7 @@ def RecFNtoIEEE(v, base=16, size=64):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='hardfloat/IEEE converter')
-    parser.add_argument('command', type=str,
+    parser.add_argument('command', type=str, choices=["recfntoieee"],
                         help='command to be executed')
     parser.add_argument('values', metavar='V', type=str, nargs='+',
                         help='value')
