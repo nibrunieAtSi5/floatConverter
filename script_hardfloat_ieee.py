@@ -99,6 +99,7 @@ def RecFNtoIEEE(v, base=16, size=64):
         return ieeefn.makeInf(sign) 
     elif recfn.isExpNaN(exp):
         # todo/fixme: payload forwarding
+        assert sig != 0, "NaN payload cannot be equal to zero in recoded format"
         return ieeefn.makeNaN(sign, payload=sig)
     elif exp < recfn.minNormalExp:
         assert exp >= recfn.minSubNormalExp, "invalid exponent"
