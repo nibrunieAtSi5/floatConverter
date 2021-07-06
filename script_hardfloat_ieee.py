@@ -14,9 +14,12 @@ class IEEEFN:
         """ build infinite value with sign """
         return ((sign << self.expSize) | (2**self.expSize - 1)) << (self.sigSize - 1)
 
-    def makeNaN(self, sign=0, qbit=1):
+    def makeNaN(self, sign=0, qbit=1, payload=None):
         """ build a NaN whose sign is sign, and whose quiet bit is set to qbit """
-        return self.makeInf(sign) | (2**(self.sigSize-2) - 1) | (qbit << (self.sigSize - 2))
+        if payload:
+            return self.makeInf(sign) | payload
+        else:
+            return self.makeInf(sign) | (2**(self.sigSize-2) - 1) | (qbit << (self.sigSize - 2))
 
     def buildValue(self, sign, exp, sig):
         """ built an arbitrary value """
@@ -96,7 +99,7 @@ def RecFNtoIEEE(v, base=16, size=64):
         return ieeefn.makeInf(sign) 
     elif recfn.isExpNaN(exp):
         # todo/fixme: payload forwarding
-        return ieeefn.makeNaN(sign)
+        return ieeefn.makeNaN(sign, payload=sig)
     elif exp < recfn.minNormalExp:
         assert exp >= recfn.minSubNormalExp, "invalid exponent"
         lzc = recfn.minNormalExp - exp
