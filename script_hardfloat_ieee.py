@@ -105,6 +105,7 @@ def RecFNtoIEEE(v, base=16, size=64):
         assert exp >= recfn.minSubNormalExp, "invalid exponent"
         lzc = recfn.minNormalExp - exp
         maskOffOne = (1 << (recfn.sigSize - 1))
+        assert ((sig >> lzc) << lzc) == sig, "subnormal significand must not have bit set with weight <= emin - s"
         return ieeefn.buildValue(sign, 0, (sig | maskOffOne) >> lzc)
     else:
         return ieeefn.buildValue(sign, recfn.expNormalToIEEE(exp),sig) 
