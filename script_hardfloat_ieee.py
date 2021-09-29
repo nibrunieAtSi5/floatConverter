@@ -207,12 +207,13 @@ if __name__ == "__main__":
                         help='force don\'t care RecFN payload to zero')
 
     args = parser.parse_args()
-    if args.command == "recfntoieee":
-        print(hex(RecFNtoIEEE_s2i(args.values[0], base=16, size=args.input_size))) 
-    elif args.command == "ieeetorecfn":
-        print(hex(IEEEToRecFN_s2i(args.values[0], base=16, size=args.input_size, randomizePayload=not args.payload_to_zero))) 
-    else:
-        raise NotImplementedError
+    for value in args.values[0].split(','):
+        if args.command == "recfntoieee":
+            print(hex(RecFNtoIEEE_s2i(value, base=16, size=args.input_size))) 
+        elif args.command == "ieeetorecfn":
+            print(hex(IEEEToRecFN_s2i(value, base=16, size=args.input_size, randomizePayload=not args.payload_to_zero))) 
+        else:
+            raise NotImplementedError
 
 
 
