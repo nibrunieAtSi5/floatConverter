@@ -7,6 +7,7 @@ class IEEEFN:
         self.sigSize = sigSize
         self.expSize = expSize
 
+
     @property
     def expInfOrNaN(self):
         return (2**self.expSize-1)
@@ -16,7 +17,7 @@ class IEEEFN:
 
     def toHardFloatRecFN(self):
         """ build the equivalent hardfloat recoded format """
-        return HardFloatRecFN(self.sigSize, self.expSize + 1)
+        return HardFloatRecFN(self.sigSize, self.expSize + 1, label=f"rec{self.label}")
 
     def makeInf(self, sign):
         """ build infinite value with sign """
@@ -43,14 +44,23 @@ class IEEEFN:
         """ check if encoded expValue is a zero's exponent """
         return expValue == 0
 
-class HardFloatRecFN:
+class StandardIEEEFN(IEEEFN):
     def __init__(self, sigSize, expSize):
+        IEEEFN.__init__(self, sigSize, expSize)
+
+    @property
+    def label(self):
+        return f"f{self.expSize + self.sigSize}"
+
+class HardFloatRecFN:
+    def __init__(self, sigSize, expSize, label):
         self.sigSize = sigSize
         self.expSize = expSize
+        self.label = label
 
     def toIEEEFN(self):
         """ build the equivalent IEEE-754 floating-point encoding """
-        return IEEEFN(self.sigSize, self.expSize-1)
+        return StandardIEEEFN(self.sigSize, self.expSize-1)
 
     @property
     def minNormalExp(self):
@@ -94,30 +104,43 @@ class HardFloatRecFN:
         assert 0 <= sig <= (2**(self.sigSize - 1) - 1)
         return (((sign << self.expSize) | exp) << self.sigSize - 1) | sig
 
-
-# Map of IEEE-754 standard floating-point formats
-IEEE_FORMAT_MAP = {
-        16: IEEEFN(11, 5),  # half precision
-        32: IEEEFN(24, 8),  # single precision
-        64: IEEEFN(53, 11), # double precision
-}
-
-# Map of hardfloat's recoded floating-point formats
-HARDFLOAT_FORMAT_MAP = {s: IEEE_FORMAT_MAP[s].toHardFloatRecFN() for s in IEEE_FORMAT_MAP}
-
+    # convert between formats, ignoring rounding, range, NaN
+    def unsafeConvert(self, x, toFmt):
+        if toFmt == self:
+            return x
+        else:
+            sign     = (x >> (self.sigSize + self.expSize)) & 1
+            fractIn  = mask(x,  (self.sigSize - 1)) # select x(sig - 2, 0)
+            expIn    = mask((x >> (self.sigSize - 1)), self.expSize) # select x(sig + exp - 1, sig - 1)
+            fractOut = (fractIn << toFmt.sigSize) >> self.sigSize
+            expCode = mask(expIn >> (self.expSize - 3), 3) # extract the 3 MSB of the exponent (where recoded format encodes NaN / 0 / Inf)
+            commonCase = (expIn + (1 << (toFmt.expSize - 1))) - (1 << (self.expSize - 1)) # update the exponent bias (subtracted from-type bias and adding to-type bias)
+            #  if expCode is 0 (value is zero) or >= 6 (infinity or NaN) then copy the expCode as result exponent upper bits
+            #  and concatenate with LSBs or rebiased exponent
+            # 
+            #  if x is a NaN what happends to its payload ?
+            #  payload is in fracIn so it gets "normalized" (align to the left of the destination mantissa) but is otherwise untouched
+            if expCode == 0 or expCode >= 6:
+                expOut = (expCode << (toFmt.expSize - 3)) | mask(commonCase, self.expSize - 3)
+            else:
+                expOut = mask(commonCase, toFmt.expSize)
+            return (((sign << toFmt.expSize) | expOut) << (toFmt.sigSize - 1)) | fractOut
+                
 def bitMask(size):
     """ generate a ful set bit mask of width <size> """
     return 2**size - 1
 
-def RecFNtoIEEE_s2i(v, base=16, size=64):
+def mask(v, size):
+   return v & bitMask(size)
+
+def RecFNtoIEEE_s2i(v, inputFormat, base=16):
     """ convert a string-encoded value <v> from recoded to IEEE format """
     v = v.replace("_", "")
     v = int(v, base=base)
-    return RecFNtoIEEE(v, size=size)
+    return RecFNtoIEEE(v, inputFormat)
 
-def RecFNtoIEEE(v, base=16, size=64):
+def RecFNtoIEEE(v, recfn):
     """ convert a value <v> from recoded format to IEEE format """
-    recfn = HARDFLOAT_FORMAT_MAP[size]
     SIGMASK = bitMask(recfn.sigSize - 1)
     sig = v & SIGMASK
     EXPMASK = bitMask(recfn.expSize)
@@ -151,8 +174,7 @@ def lzc(value, size):
         index -= 1
     return count
 
-def IEEEtoRecFN(v, base=16, size=64, randomizePayload=True):
-    ieeeFmt = IEEE_FORMAT_MAP[size]
+def IEEEtoRecFN(v, ieeeFmt, randomizePayload=True):
     recfn = ieeeFmt.toHardFloatRecFN()
 
     SIGMASK = bitMask(ieeeFmt.sigSize - 1)
@@ -184,16 +206,30 @@ def IEEEtoRecFN(v, base=16, size=64, randomizePayload=True):
         biasedExp = (exp - 1) + recfn.minNormalExp
         return recfn.buildValue(sign, biasedExp, sig)
 
-def IEEEToRecFN_s2i(v, base=16, size=64, randomizePayload=True):
+def IEEEToRecFN_s2i(v, inputFormat, base=16, randomizePayload=True):
     """ convert a string-encoded value <v> from recoded to IEEE format """
     v = v.replace("_", "")
     v = int(v, base=base)
-    return IEEEtoRecFN(v, size=size, randomizePayload=randomizePayload)
+    return IEEEtoRecFN(v, inputFormat, randomizePayload=randomizePayload)
 
 assert(lzc(0xff, 8) == 0)
 assert(lzc(0xf, 13) == 9)
 
 
+
+# Map of IEEE-754 standard floating-point formats
+IEEE_FORMAT_LIST = [
+        StandardIEEEFN(11, 5),  # half precision
+        StandardIEEEFN(24, 8),  # single precision
+        StandardIEEEFN(53, 11), # double precision
+]
+
+# Map of hardfloat's recoded floating-point formats
+HARDFLOAT_FORMAT_LIST = [ieeeFmt.toHardFloatRecFN() for ieeeFmt in IEEE_FORMAT_LIST]
+
+# list and dictionnary (indexed by label) of all format
+FORMAT_LIST = IEEE_FORMAT_LIST + HARDFLOAT_FORMAT_LIST
+FORMAT_MAP = {f.label: f for f in FORMAT_LIST}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='hardfloat/IEEE converter')
@@ -201,17 +237,30 @@ if __name__ == "__main__":
                         help='command to be executed')
     parser.add_argument('values', metavar='V', type=str, nargs='+',
                         help='value')
-    parser.add_argument('--input-size', type=int, action='store', default=64,
-                        help='input value size')
+    parser.add_argument('--input-format', type=str, action='store', default="f64", choices=list(FORMAT_MAP.keys()),
+                        help='input format')
     parser.add_argument('--payload-to-zero', const=True, default=False, action='store_const', 
+                        help='force don\'t care RecFN payload to zero')
+    parser.add_argument('--unsafe-convert-to', default=None, action='store', choices=list(recFmt.label for recFmt in HARDFLOAT_FORMAT_LIST), 
                         help='force don\'t care RecFN payload to zero')
 
     args = parser.parse_args()
+
+    inputFormat = FORMAT_MAP[args.input_format]
+
     for value in args.values[0].split(','):
         if args.command == "recfntoieee":
-            print(hex(RecFNtoIEEE_s2i(value, base=16, size=args.input_size))) 
+            ieeeValue = RecFNtoIEEE_s2i(value, inputFormat, base=16) 
+            print(hex(ieeeValue)) 
+                
         elif args.command == "ieeetorecfn":
-            print(hex(IEEEToRecFN_s2i(value, base=16, size=args.input_size, randomizePayload=not args.payload_to_zero))) 
+            recodedValue = IEEEToRecFN_s2i(value, inputFormat, base=16, randomizePayload=not args.payload_to_zero)
+            print(hex(recodedValue)) 
+            if args.unsafe_convert_to:
+                recfn = inputFormat.toHardFloatRecFN()
+                toFmt = FORMAT_MAP[args.unsafe_convert_to]
+                extendedValue = recfn.unsafeConvert(recodedValue, toFmt)
+                print(hex(extendedValue)) 
         else:
             raise NotImplementedError
 

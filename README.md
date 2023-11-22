@@ -5,14 +5,17 @@ Utility to convert between hardfloat and IEEE format
 ## Usage
 
 ```
-python3 floatConverter/script_hardfloat_ieee.py --input-size <bitsize> <command> <input value>
+python3 floatConverter/script_hardfloat_ieee.py --input-format <format> <command> <input value>
 ```
 
-`<bitsize>` can be any of 16, 32, 64.
 
 
 List of supported `command`:
-* `recfntoieee` convert between hardfloat's recoded-format of size `bitsize` to IEEE encoding of size `bitsize`
+
+* `recfntoieee` convert between hardfloat's recoded-format <format> to the IEEE encoding in the corresponding IEEE format`
+*** `<format>` can be any of recf16, recf32, recf64.
+* `ieeetorecfn` convert between IEEE format <format> to the corresponding hardfloat's recoded-format
+*** `<format>` can be any of f16, f32, f64.
 
 `<input value>` is an hexadecimal string, `_` separators are accepted.
 
@@ -20,5 +23,5 @@ List of supported `command`:
 ## Example
 
 ```
-python3 floatConverter/script_hardfloat_ieee.py --input-size 64 recfntoieee 0_8287_c7b7_ccdd_d1fa
+python3 script_hardfloat_ieee.py ieeetorecfn --input-format f16 --unsafe-convert-to recf64 1f80
 ```
