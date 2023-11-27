@@ -121,7 +121,7 @@ class HardFloatRecFN:
             #  if x is a NaN what happends to its payload ?
             #  payload is in fracIn so it gets "normalized" (align to the left of the destination mantissa) but is otherwise untouched
             if expCode == 0 or expCode >= 6:
-                expOut = (expCode << (toFmt.expSize - 3)) | mask(commonCase, self.expSize - 3)
+                expOut = (expCode << (toFmt.expSize - 3)) | mask(commonCase, toFmt.expSize - 3)
             else:
                 expOut = mask(commonCase, toFmt.expSize)
             return (((sign << toFmt.expSize) | expOut) << (toFmt.sigSize - 1)) | fractOut
